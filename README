@@ -1,0 +1,13 @@
+Shows cached locations from your android phone.
+
+ROOT REQUIRED!
+- Map (Google Maps)
+- List (text)
+
+Credits
+packetlss (information about the cache files)
+https://github.com/packetlss/android-locdump
+
+Stericson (RootTools)
+https://code.google.com/p/roottools/
+
