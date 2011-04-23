@@ -207,7 +207,7 @@ public class RootTools {
         }
         return false;
     }
-
+    
     /**
      * @return  <code>true</code> if your app has been given root access.
      * 

@@ -28,6 +28,9 @@ public class LocationCacheDatabase {
 	{		
 		try {
 			RandomAccessFile in = new RandomAccessFile(mFilename, "r");
+			if (in.length() < 4) {
+				throw new Exception("empty cache file");
+			}
 			
 			mVersion = in.readShort();
 			mNumEntries = in.readShort();
