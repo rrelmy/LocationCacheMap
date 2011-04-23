@@ -1,5 +1,6 @@
 package ch.rrelmy.android.locationcachemap;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.List;
 
@@ -31,7 +32,7 @@ public class Main extends Activity {
 	
 	public static final String LOG_TAG = "LocCacheMap";
 	public static final String CACHE_DIR = "/data/data/com.google.android.location/files";
-	public static final String TMP_DIR = "/data/local/tmp/";
+	public static final String TMP_DIR = "/data/tmp/";
 	
 	protected TableLayout mMainLayout;
 	protected TextView mTextLayout;
@@ -40,6 +41,8 @@ public class Main extends Activity {
 	protected TableLayout mBtnLockLayout;
 	protected Button mBtnBlock;
 	protected Button mBtnUnblock;
+	
+	protected short mImmutable = -1;
 	
 	@Override
     public void onCreate(Bundle savedInstanceState)
@@ -51,7 +54,7 @@ public class Main extends Activity {
         if (!RootTools.isRootAvailable()) {
             exitWithDialog("Sorry, you need to root your device to be able to use this application.", "Exit");
         } else if (!RootTools.isAccessGiven()) {
-        	exitWithDialog("You have to grant the root privilegs, otherwise the app can't run.", "Exit");
+        	exitWithDialog("You have to grant root privilegs, otherwise the app won't work.", "Exit");
         } else {
         	// we hope that everything works here... :)
         	_runApp();
@@ -60,6 +63,9 @@ public class Main extends Activity {
 
     protected void _runApp()
     {
+    	
+    	Log.i(LOG_TAG, "immutable: " + supportsImmutable());
+    	
     	// do some cool stuff!
     	mMainLayout = new TableLayout(this);
     	mMainLayout.setPadding(20, 20, 20, 20);
@@ -108,7 +114,7 @@ public class Main extends Activity {
         }
         
         // block + unblock
-        if (supportsBlocking()) {
+        if (RootTools.isBusyboxAvailable()) {
         	// block
     		mBtnBlock = new Button(this);
     		mBtnBlock.setText("block cache files");
@@ -148,7 +154,7 @@ public class Main extends Activity {
         	}
         } else {
         	TextView mBlockInfo = new TextView(this);
-        	mBlockInfo.setText("blocking is only available if busybox is installed with lsattr and chattr applets!");
+        	mBlockInfo.setText("blocking is only available if busybox is installed!");
         	mBlockInfo.setTextColor(Color.RED);
         	mMainLayout.addView(mBlockInfo);
         }
@@ -252,7 +258,10 @@ public class Main extends Activity {
     	try {
     		RootTools.sendShell("rm " + CACHE_DIR + "/cache.wifi && rm  " + CACHE_DIR + "/cache.cell");
         	RootTools.sendShell("touch " + CACHE_DIR + "/cache.wifi && touch  " + CACHE_DIR + "/cache.cell");
-			RootTools.sendShell("chattr +i " + CACHE_DIR + "/cache.wifi && chattr +i  " + CACHE_DIR + "/cache.cell");
+        	if (supportsImmutable()) {
+        		RootTools.sendShell("chattr +i " + CACHE_DIR + "/cache.wifi && chattr +i  " + CACHE_DIR + "/cache.cell");
+        	}
+        	RootTools.sendShell("chmod 0000 " + CACHE_DIR + "/cache.wifi && chmod 0000  " + CACHE_DIR + "/cache.cell");
 		} catch (Exception e) {
 			e.printStackTrace();
 			Toast.makeText(this, "Error please look at logcat output", Toast.LENGTH_LONG);
@@ -262,10 +271,22 @@ public class Main extends Activity {
     protected boolean _isBlocked()
     {
     	try {
-    		List<String> result = RootTools.sendShell("busybox lsattr " + CACHE_DIR + "| grep -i cache");
-    		if (result.size() > 0) {
-    			String res = result.get(0);
-    			return res.substring(0, res.indexOf(" ")).contains("i");
+    		List<String> result;
+    		if (supportsImmutable()) {
+    			// immutable
+	    		result = RootTools.sendShell("busybox lsattr " + CACHE_DIR + "| grep -i cache");
+	    		if (result.size() > 0) {
+	    			String res = result.get(0);
+	    			return res.substring(0, res.indexOf(" ")).contains("i");
+	    		}
+    		} else {
+    			// chmodded
+    			result = RootTools.sendShell("ls -l " + CACHE_DIR + "| grep -i cache");
+    			if (result.size() > 0) {
+    				String res = result.get(0);
+    				Log.i(LOG_TAG, res);
+    				return !res.substring(0, 4).contains("w");
+    			}
     		}
     	} catch (Exception e) {
     		e.printStackTrace();
@@ -276,7 +297,9 @@ public class Main extends Activity {
     protected void _unblock()
     {
     	try {
-    		RootTools.sendShell("busybox chattr -i " + CACHE_DIR + "/cache.wifi && busybox chattr -i  " + CACHE_DIR + "/cache.cell");
+    		if (supportsImmutable()) {
+    			RootTools.sendShell("busybox chattr -i " + CACHE_DIR + "/cache.wifi && busybox chattr -i  " + CACHE_DIR + "/cache.cell");
+    		}
     		RootTools.sendShell("rm " + CACHE_DIR + "/cache.wifi && rm  " + CACHE_DIR + "/cache.cell");
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -347,6 +370,16 @@ public class Main extends Activity {
     
     protected void _copyToTemp()
     {
+    	// create temporary directory if it does not exist
+    	try {
+    		File tmpDir = new File(TMP_DIR);
+    		if (!tmpDir.exists()) {
+    			RootTools.sendShell("mkdir " + TMP_DIR + " && chmod 0777 " + TMP_DIR);
+    		}
+    	} catch (Exception e) {
+    		e.printStackTrace();
+    	}
+    	
     	try {
     		_removeTempFiles();
     		
@@ -398,32 +431,35 @@ public class Main extends Activity {
 		dialog.show();
 	}
 	
-	public boolean supportsBlocking()
+	public boolean supportsImmutable()
 	{
-		// busybox with lsattr and chattr applets is required
-		
-		if (RootTools.isBusyboxAvailable()) {
+		if (mImmutable == -1) {
+			mImmutable = 0;
+			// busybox with lsattr and chattr applets is required
 			
-			// check for applets
-			boolean hazLsAttr = false;
-			boolean hazChAttr = false;
-			try {
-				List<String> result = RootTools.sendShell("busybox --list | grep -i attr");
-				
-				for (String applet : result) {
-					if (applet.trim().equals("chattr")) {
-						hazChAttr = true;
-					} else if (applet.trim().equals("lsattr")) {
-						hazLsAttr = true;
+			if (RootTools.isBusyboxAvailable()) {
+	
+				// check for applets
+				boolean hazLsAttr = false;
+				boolean hazChAttr = false;
+				try {
+					List<String> result = RootTools.sendShell("busybox --list | grep -i attr");
+					
+					for (String applet : result) {
+						if (applet.trim().equals("chattr")) {
+							hazChAttr = true;
+						} else if (applet.trim().equals("lsattr")) {
+							hazLsAttr = true;
+						}
 					}
+					mImmutable = (short) (hazLsAttr && hazChAttr ? 1 : 0);
+					
+				} catch (Exception e) {
+					e.printStackTrace();
 				}
-				return (hazLsAttr && hazChAttr);
-				
-			} catch (Exception e) {
-				e.printStackTrace();
 			}
 		}
 		
-		return false;
+		return mImmutable == 1;
 	}
 }
