@@ -8,6 +8,10 @@ Changelog v0.2
 - option to delete the cache
 - option to block the caches (no data will be written to the disc) (busybox required with lsattr && chattr!)
 - hopefully fixed a FC on Epic 4G (untested)
+v0.3
+- easier blocking (lsattr/chattr not required)
+- fix if tmp dir does not exists
+
 
 Credits
 packetlss (information about the cache files)
