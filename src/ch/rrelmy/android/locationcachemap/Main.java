@@ -276,7 +276,7 @@ public class Main extends Activity {
     protected void _unblock()
     {
     	try {
-    		RootTools.sendShell("bosybox chattr -i " + CACHE_DIR + "/cache.wifi && busybox chattr -i  " + CACHE_DIR + "/cache.cell");
+    		RootTools.sendShell("busybox chattr -i " + CACHE_DIR + "/cache.wifi && busybox chattr -i  " + CACHE_DIR + "/cache.cell");
     		RootTools.sendShell("rm " + CACHE_DIR + "/cache.wifi && rm  " + CACHE_DIR + "/cache.cell");
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -411,16 +411,12 @@ public class Main extends Activity {
 				List<String> result = RootTools.sendShell("busybox --list | grep -i attr");
 				
 				for (String applet : result) {
-					Log.i(LOG_TAG, ">" + applet.trim() + "<");
 					if (applet.trim().equals("chattr")) {
-						Log.i(LOG_TAG, "cmp: " + applet.trim().equals("chattr"));
 						hazChAttr = true;
 					} else if (applet.trim().equals("lsattr")) {
 						hazLsAttr = true;
 					}
 				}
-				Log.i(LOG_TAG, "lsattr: " + hazLsAttr);
-				Log.i(LOG_TAG, "chattr: " + hazChAttr);
 				return (hazLsAttr && hazChAttr);
 				
 			} catch (Exception e) {
