@@ -98,7 +98,10 @@ public class Main extends Activity {
 			});
         	mMainLayout.addView(btnText);
         	
-        	if (mApp.mDbWifi.getNumEntriesWithPos() > 0 || mApp.mDbCell.getNumEntriesWithPos() > 0) {
+        	if (
+        			(mApp.mDbWifi != null && mApp.mDbWifi.getNumEntriesWithPos() > 0) || 
+        			(mApp.mDbCell != null && mApp.mDbCell.getNumEntriesWithPos() > 0)
+        	) {
         		// show on map
 	        	Button btnMap = new Button(this);
 	        	btnMap.setText("view map");
