@@ -42,7 +42,8 @@ public class ShowMapActivity extends MapActivity {
         mapView = new MapView(this, API_KEY_DEBUG);
         mapView.setClickable(true);
         mapView.setBuiltInZoomControls(true);
-        mapView.getController().setZoom(12);
+        mapView.getController().setZoom(10);
+        mapView.setSatellite(false);
         
         this.setContentView(mapView);
         
@@ -69,7 +70,11 @@ public class ShowMapActivity extends MapActivity {
                 cellOverlay.addOverlay(overlayitem);
         	}
         	
-        	mapView.getOverlays().add(cellOverlay);
+        	if (cellOverlay.size() > 0) {
+        		mapView.getOverlays().add(cellOverlay);
+        	} else {
+        		cellOverlay = null;
+        	}
         }
         
         // wifi
@@ -93,7 +98,11 @@ public class ShowMapActivity extends MapActivity {
                 wifiOverlay.addOverlay(overlayitem);
         	}
         	
-        	mapView.getOverlays().add(wifiOverlay);
+        	if (wifiOverlay.size() > 0) {
+        		mapView.getOverlays().add(wifiOverlay);
+        	} else {
+        		wifiOverlay = null;
+        	}
         }
     }
 	
@@ -103,12 +112,12 @@ public class ShowMapActivity extends MapActivity {
 	}
 
 	public boolean onCreateOptionsMenu(Menu menu) {
-    	menu.add(0, MENU_ITEM_CHANGE_MODE, 0, mapView.isSatellite() ? "Normal" : "Satellite");
-    	if (mApp.mDbCell != null && mApp.mDbCell.getNumEntries() > 0) {
-    		menu.add(0, MENU_ITEM_TOGGLE_CELL, 0, "Toggle Cell");
+    	menu.add(0, MENU_ITEM_CHANGE_MODE, 0, mapView.isSatellite() ? "Map" : "Satellite").setIcon(android.R.drawable.ic_menu_mapmode);
+    	if (mApp.mDbCell != null && mApp.mDbCell.getNumEntriesWithPos() > 0) {
+    		menu.add(0, MENU_ITEM_TOGGLE_CELL, 0, "Toggle Cell").setIcon(R.drawable.marker_cell);
     	}
-    	if (mApp.mDbWifi != null && mApp.mDbWifi.getNumEntries() > 0) {
-    		menu.add(0, MENU_ITEM_TOGGLE_WIFI, 0, "Toggle WiFi");
+    	if (mApp.mDbWifi != null && mApp.mDbWifi.getNumEntriesWithPos() > 0) {
+    		menu.add(0, MENU_ITEM_TOGGLE_WIFI, 0, "Toggle WiFi").setIcon(R.drawable.marker_wifi);
     	}
     	
     	return super.onCreateOptionsMenu(menu);
@@ -138,10 +147,10 @@ public class ShowMapActivity extends MapActivity {
     {
     	mapView.getOverlays().clear();
     	
-    	if (showWifi) {
+    	if (showWifi && wifiOverlay != null && wifiOverlay.size() > 0) {
     		mapView.getOverlays().add(wifiOverlay);
     	}
-    	if (showCell) {
+    	if (showCell && cellOverlay != null && cellOverlay.size() > 0) {
     		mapView.getOverlays().add(cellOverlay);
     	}
     	mapView.invalidate();

@@ -11,7 +11,9 @@ Changelog v0.2
 v0.3
 - easier blocking (lsattr/chattr not required)
 - fix if tmp dir does not exists
-
+v0.4
+- fixed map FC
+- gpx export
 
 Credits
 packetlss (information about the cache files)

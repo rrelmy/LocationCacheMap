@@ -15,6 +15,8 @@ public class LocationCacheDatabase {
 	protected short mNumEntries;
 	protected LocationCacheEntrie[] mEntries;
 	
+	protected short mNumEntriesWithPos = 0;
+	
 	public LocationCacheDatabase(String type, String filename) throws Exception
 	{
 		mType = type;
@@ -51,6 +53,9 @@ public class LocationCacheDatabase {
 				
 				// accuracy int
 				entrie.setAccuracy(in.readInt());
+				if (entrie.getAccuracy() >= 0) {
+					mNumEntriesWithPos++;
+				}
 				
 				// confidence int
 				entrie.setConfidence(in.readInt());
@@ -67,7 +72,6 @@ public class LocationCacheDatabase {
 				mEntries[i] = entrie;
 			}
 		} catch (Exception e) {
-			// TODO Auto-generated catch block
 			//e.printStackTrace();
 			e.printStackTrace();
 			Log.e(Main.LOG_TAG, "" + e.getMessage());
@@ -85,6 +89,11 @@ public class LocationCacheDatabase {
 		return mNumEntries;
 	}
 	
+	public short getNumEntriesWithPos()
+	{
+		return mNumEntriesWithPos;
+	}
+	
 	public LocationCacheEntrie[] getEntries()
 	{
 		return mEntries;
@@ -93,6 +102,20 @@ public class LocationCacheDatabase {
 	public String getType()
 	{
 		return mType;
+	}
+	
+	public String toGpxEntries()
+	{
+		String content = "";
+		
+		for (LocationCacheEntrie entrie : getEntries()) {
+			if (entrie.getAccuracy() < 0) {
+				continue;
+			}
+			content += entrie.toGpx(getType());
+		}
+		
+		return content;
 	}
 	
 }

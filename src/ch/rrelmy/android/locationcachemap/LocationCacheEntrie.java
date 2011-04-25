@@ -1,5 +1,6 @@
 package ch.rrelmy.android.locationcachemap;
 
+import java.text.SimpleDateFormat;
 import java.util.Date;
 
 import android.text.format.DateFormat;
@@ -83,5 +84,15 @@ public class LocationCacheEntrie {
 			"longitude: " + mLongitude + "\n" + 
 			"date: " + DateFormat.format("dd.MM.yyyy kk:mm", new Date(mDate)) + "\n"
 		;
+	}
+	
+	public String toGpx(String type)
+	{
+		return
+			"<trkpt lat=\"" + getLatitude() + "\" lon=\"" + getLongitude() + "\">" +
+				"<time>" + (new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'").format(new Date(getDate())).toString()) + "</time>" +
+				"<name>" + getKey() + "</name>" +
+				"<desc>type: " + type + ", accuracy: " + getAccuracy() + ", confidence: " + getConfidence() + "</desc>" +
+			"</trkpt>\n";
 	}
 }

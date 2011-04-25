@@ -1,7 +1,11 @@
 package ch.rrelmy.android.locationcachemap;
 
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.List;
 
 import android.app.Activity;
@@ -10,7 +14,12 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
+import android.os.Environment;
+import android.text.Html;
+import android.text.method.LinkMovementMethod;
 import android.util.Log;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
@@ -34,11 +43,14 @@ public class Main extends Activity {
 	public static final String CACHE_DIR = "/data/data/com.google.android.location/files";
 	public static final String TMP_DIR = "/data/tmp/";
 	
+	public static final short MENU_ITEM_ABOUT = 1;
+	
 	protected TableLayout mMainLayout;
 	protected TextView mTextLayout;
 	protected TextView mInfo;
 	
 	protected TableLayout mBtnLockLayout;
+	protected Button mBtnFlush;
 	protected Button mBtnBlock;
 	protected Button mBtnUnblock;
 	
@@ -48,7 +60,7 @@ public class Main extends Activity {
     public void onCreate(Bundle savedInstanceState)
     {
         super.onCreate(savedInstanceState);
-        
+             
         mApp = (AppState) getApplication();
         
         if (!RootTools.isRootAvailable()) {
@@ -63,13 +75,11 @@ public class Main extends Activity {
 
     protected void _runApp()
     {
-    	
-    	Log.i(LOG_TAG, "immutable: " + supportsImmutable());
-    	
-    	// do some cool stuff!
+    	// build the layout
     	mMainLayout = new TableLayout(this);
     	mMainLayout.setPadding(20, 20, 20, 20);
 
+    	// load databeses
         _initDatabases();
 
         TableRow row = new TableRow(this);
@@ -79,45 +89,65 @@ public class Main extends Activity {
         
         if (mApp.mDbWifi != null || mApp.mDbCell != null) {
         	Button btnText = new Button(this);
-        	btnText.setText("View list");
+        	btnText.setText("view list");
         	btnText.setOnClickListener(new View.OnClickListener() {
 				@Override
 				public void onClick(View v) {
 					_viewText();
 				}
 			});
-        	
-        	Button btnMap = new Button(this);
-        	btnMap.setText("View on map");
-        	btnMap.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View v) {
-					_viewMap();
-				}
-			});
-        	
         	mMainLayout.addView(btnText);
-        	mMainLayout.addView(btnMap);
+        	
+        	if (mApp.mDbWifi.getNumEntriesWithPos() > 0 || mApp.mDbCell.getNumEntriesWithPos() > 0) {
+        		// show on map
+	        	Button btnMap = new Button(this);
+	        	btnMap.setText("view map");
+	        	btnMap.setOnClickListener(new View.OnClickListener() {
+					@Override
+					public void onClick(View v) {
+						_viewMap();
+					}
+				});
+	        	mMainLayout.addView(btnMap);
+	        	
+	        	// export gpx
+	        	Button btnExport = new Button(this);
+	        	btnExport.setText("export gpx to sdcard");
+	        	btnExport.setOnClickListener(new View.OnClickListener() {
+					@Override
+					public void onClick(View v) {
+						exportGpx();
+					}
+				});
+	        	
+	        	mMainLayout.addView(btnExport);
+        	} else {
+        		TextView mapInfo = new TextView(this);
+        		mapInfo.setPadding(0, 10, 0, 10);
+        		mapInfo.setText("Map not available.\nThere is some data but no gps data attached with it.");
+        		mMainLayout.addView(mapInfo);
+        	}
         	
         	// flush databases
-        	Button btnFlush = new Button(this);
-        	btnFlush.setText("Empty databases");
-        	btnFlush.setTextColor(Color.RED);
-        	btnFlush.setOnClickListener(new View.OnClickListener() {
+        	mBtnFlush = new Button(this);
+        	mBtnFlush.setText("empty caches");
+        	mBtnFlush.setTextColor(Color.RED);
+        	mBtnFlush.setOnClickListener(new View.OnClickListener() {
 				@Override
 				public void onClick(View v) {
 					_showFlushDialog();
 				}
 			});
         	
-        	mMainLayout.addView(btnFlush);
+        	mMainLayout.addView(mBtnFlush);
+        	getGpxContent();
         }
         
         // block + unblock
         if (RootTools.isBusyboxAvailable()) {
         	// block
     		mBtnBlock = new Button(this);
-    		mBtnBlock.setText("block cache files");
+    		mBtnBlock.setText("empty & block caches");
     		mBtnBlock.setTextColor(Color.RED);
     		mBtnBlock.setOnClickListener(new View.OnClickListener() {
 				@Override
@@ -145,6 +175,7 @@ public class Main extends Activity {
     		mBtnLockLayout = new TableLayout(this);
     		mMainLayout.addView(mBtnLockLayout);
     		
+    		Log.i(LOG_TAG, "cache blocked: " + _isBlocked());
         	if (_isBlocked()) {
         		// unblock
         		mBtnLockLayout.addView(mBtnUnblock);
@@ -160,18 +191,15 @@ public class Main extends Activity {
         }
         
         // info
-        TextView mInfo = new TextView(this);
-    	mInfo.setText(
-    			"\n\n" +
-    			"Disclaimer\n" + 
-    			"The data displayed comes from 2 files on your device. " +
-    			"This application does only display this data!\n\n" +
-    			
-    			"Credits\n" +
-    			"packetlss (information about the cache files)\n" +
-    			"Stericson (RootTools)"
-    	);
-    	mMainLayout.addView(mInfo);
+        mInfo = new TextView(this);
+        mInfo.setPadding(0, 20, 0, 0);
+        mInfo.setText(
+        		"If no data is found you most likely disabled «Use wireless networks» under «Location & Security» settings or you already have deleted it.\n" +
+        		"If you disable this option no data will be recorded but it needs longer to search for your location on Maps etc.\n" +
+        		"\n" +
+        		"Blocking with this application does not disable «Use wireless networks», the location lock remains fast and no data will be leftover on your device."
+        );
+        mMainLayout.addView(mInfo);
         
     	ScrollView scrollView = new ScrollView(this);
     	scrollView.addView(mMainLayout);
@@ -229,6 +257,9 @@ public class Main extends Activity {
 				_flushAndBlockCaches();
 				mBtnLockLayout.removeView(mBtnBlock);
 				mBtnLockLayout.addView(mBtnUnblock);
+				if (mBtnFlush != null) {
+					mMainLayout.removeView(mBtnFlush);
+				}
 				Toast.makeText(mApp, "cache files blocked", Toast.LENGTH_SHORT).show();
 			}
 		});
@@ -274,6 +305,7 @@ public class Main extends Activity {
     		List<String> result;
     		if (supportsImmutable()) {
     			// immutable
+    			Log.i(LOG_TAG, "immutable blocking");
 	    		result = RootTools.sendShell("busybox lsattr " + CACHE_DIR + "| grep -i cache");
 	    		if (result.size() > 0) {
 	    			String res = result.get(0);
@@ -281,6 +313,7 @@ public class Main extends Activity {
 	    		}
     		} else {
     			// chmodded
+    			Log.i(LOG_TAG, "chmod blocking");
     			result = RootTools.sendShell("ls -l " + CACHE_DIR + "| grep -i cache");
     			if (result.size() > 0) {
     				String res = result.get(0);
@@ -318,6 +351,33 @@ public class Main extends Activity {
     	Intent intent = new Intent();
     	intent.setClassName(this.getPackageName(), this.getPackageName() + ".ShowMapActivity");
 		startActivity(intent);
+    }
+    
+    protected void _viewAbout()
+    {
+    	AlertDialog.Builder dialog = new AlertDialog.Builder(this);
+    	dialog.setTitle("About");
+    	
+    	TextView about = new TextView(this);
+    	about.setPadding(10, 10, 10, 10);
+    	about.setText(Html.fromHtml(
+				"<p><b>Disclaimer</b><br />" + 
+    			"The data displayed comes from 2 files on your device. " +
+    			"This application does only display this data!</p>" +
+    			
+    			"<p>License: GPLv3<br />" +
+    			"Source: <a href=\"https://github.com/rrelmy/LocationCacheMap\">github.com</a><br />" +
+    			"Contact: <a href=\"mailto:remyboehler@gmail.com\">remyboehler@gmail.com</a></p>" +
+    			
+    			"<p><b>Credits</b><br />" +
+    			"<a href=\"https://twitter.com/packetlss\">packetlss</a> (<a href=\"https://github.com/packetlss/android-locdump\">android-locdump</a>)<br />" +
+    			"<a href=\"https://twitter.com/Stericson\">Stericson</a> (<a href=\"https://code.google.com/p/roottools/\">RootTools</a>)</p>"
+		));
+    	about.setMovementMethod(LinkMovementMethod.getInstance());
+    	
+		dialog.setView(about);
+
+		dialog.show();
     }
     
     protected void _addDbInfoToLayout(LinearLayout layout, LocationCacheDatabase db, String name)
@@ -462,4 +522,91 @@ public class Main extends Activity {
 		
 		return mImmutable == 1;
 	}
+	
+	
+	public boolean onCreateOptionsMenu(Menu menu) {
+    	menu.add(0, MENU_ITEM_ABOUT, 0, "About").setIcon(android.R.drawable.ic_menu_info_details);
+    	
+    	return super.onCreateOptionsMenu(menu);
+    }
+    
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        switch (item.getItemId()) {
+	        case MENU_ITEM_ABOUT:
+	            _viewAbout();
+	            return true;
+        }
+        
+        return super.onOptionsItemSelected(item);
+    }
+    
+    public void exportGpx()
+    {
+    	try {
+    	    File root = Environment.getExternalStorageDirectory();
+    	    if (root.canWrite()){
+    	        // write
+    	    	File gpxfile = new File(root, "location-cache-export-" + (new SimpleDateFormat("yyyy.MM.dd-HH.mm.ss").format(new Date()).toString()) + ".gpx");
+    	        FileWriter gpxwriter = new FileWriter(gpxfile);
+    	        BufferedWriter out = new BufferedWriter(gpxwriter);
+    	        out.write(getGpxContent());
+    	        out.close();
+    	        
+    	        // dialog
+    	        AlertDialog.Builder dialog = new AlertDialog.Builder(this);
+    	    	dialog.setTitle("Export");
+    			dialog.setMessage(
+    					"GPX file exported to:\n" +
+    					gpxfile.getAbsolutePath()
+    			);
+    			dialog.setPositiveButton("Ok", null);
+
+    			dialog.show();
+    	    } else {
+    	    	throw new IOException("not writeable");
+    	    }
+    	} catch (IOException e) {
+    		e.printStackTrace();
+    	    Log.e(LOG_TAG, "Could not write file " + e.getMessage());
+    	    Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
+    	}
+    }
+	
+    public String getGpxContent()
+    {
+    	// export a valid gpx file
+    	
+    	String content = "";
+    	short numEntries = 0;
+    	
+    	
+    	if (mApp.mDbCell != null && mApp.mDbCell.getNumEntriesWithPos() > 0) {
+    		numEntries += mApp.mDbCell.getNumEntriesWithPos();
+    		content += mApp.mDbCell.toGpxEntries();
+    	}
+    	
+    	if (mApp.mDbWifi != null && mApp.mDbWifi.getNumEntriesWithPos() > 0) {
+    		numEntries += mApp.mDbWifi.getNumEntriesWithPos();
+    		content += mApp.mDbWifi.toGpxEntries();
+    	}
+    	
+    	content =
+    			"<gpx xmlns=\"http://www.topografix.com/GPX/1/1\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" version=\"1.1\" xsi:schemaLocation=\"http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd\" creator=\"Location Cache Map\">\n" +
+    				"<metadata>\n" + 
+    					"<name>Android Location Cache</name>\n" +
+    					"<desc>total entries: " + numEntries + "</desc>\n" +
+    				"</metadata>\n" +
+    				"<trk>\n" +
+    					"<trkseg>\n" +
+    					
+    					content +
+    					
+    					"</trkseg>\n" +
+    				"</trk>\n" +
+    			"</gpx>\n";
+    	
+    	return content;
+    }
+    
 }
