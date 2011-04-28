@@ -1,5 +1,7 @@
 package ch.rrelmy.android.locationcachemap;
 
+import java.io.BufferedWriter;
+import java.io.IOException;
 import java.io.RandomAccessFile;
 
 import android.util.Log;
@@ -104,18 +106,15 @@ public class LocationCacheDatabase {
 		return mType;
 	}
 	
-	public String toGpxEntries()
-	{
-		String content = "";
-		
+	public void writeGpx(BufferedWriter out) throws IOException
+	{	
 		for (LocationCacheEntrie entrie : getEntries()) {
 			if (entrie.getAccuracy() < 0) {
 				continue;
 			}
-			content += entrie.toGpx(getType());
+			out.write(entrie.toGpx(getType()));
 		}
 		
-		return content;
 	}
 	
 }

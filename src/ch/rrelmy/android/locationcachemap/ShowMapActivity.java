@@ -4,10 +4,13 @@ import java.util.ArrayList;
 
 import android.app.AlertDialog;
 import android.content.Context;
+import android.graphics.Paint;
+import android.graphics.Point;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.widget.RelativeLayout;
 
 import com.google.android.maps.GeoPoint;
 import com.google.android.maps.ItemizedOverlay;
@@ -21,16 +24,19 @@ public class ShowMapActivity extends MapActivity {
 	public static final String API_KEY_DEBUG = "0PDkq2xA4PtT5-WMQw_izRXVe4PN-HBe-AMDP5g";
 	public static final String API_KEY = "0PDkq2xA4PtQ2iB9kfC9Defl-yp7uGGlmQS0osQ";
 	
-	protected MapView mapView;
-	protected MyItemizedOverlay cellOverlay;
-	protected MyItemizedOverlay wifiOverlay;
+	protected MapView mMapView;
+	protected MyItemizedOverlay mCellOverlay;
+	protected MyItemizedOverlay mWifiOverlay;
 	
-	protected boolean showCell = false;
-	protected boolean showWifi = false;
+	protected boolean mShowCell = false;
+	protected boolean mShowWifi = false;
+	
+	protected boolean mShowAccuracy = true;
 	
 	protected static final short MENU_ITEM_CHANGE_MODE = 1;
 	protected static final short MENU_ITEM_TOGGLE_CELL = 2;
 	protected static final short MENU_ITEM_TOGGLE_WIFI = 3;
+	protected static final short MENU_ITEM_TOGGLE_ACCURACY = 4;
 	
 	@Override
     public void onCreate(Bundle savedInstanceState)
@@ -39,20 +45,24 @@ public class ShowMapActivity extends MapActivity {
         
         mApp = (AppState) getApplication();
 
-        mapView = new MapView(this, API_KEY_DEBUG);
-        mapView.setClickable(true);
-        mapView.setBuiltInZoomControls(true);
-        mapView.getController().setZoom(10);
-        mapView.setSatellite(false);
+        RelativeLayout mFrame = new RelativeLayout(this);
         
-        this.setContentView(mapView);
+        mMapView = new MapView(this, API_KEY_DEBUG);
+        mMapView.setClickable(true);
+        mMapView.setBuiltInZoomControls(true);
+        mMapView.getController().setZoom(10);
+        mMapView.setSatellite(false);
+        
+        mFrame.addView(mMapView);
+        
+        this.setContentView(mFrame);
         
         // cells
         int i = 0;
         if (mApp.mDbCell != null && mApp.mDbCell.getNumEntries() > 0) {
-        	showCell = true;
+        	mShowCell = true;
         	Drawable drawableCell = this.getResources().getDrawable(R.drawable.marker_cell);
-            cellOverlay = new MyItemizedOverlay(drawableCell, this);
+            mCellOverlay = new MyItemizedOverlay(drawableCell, this);
         	
         	for (LocationCacheEntrie entrie : mApp.mDbCell.getEntries()) {
         		if (entrie.getAccuracy() < 0) {
@@ -63,25 +73,26 @@ public class ShowMapActivity extends MapActivity {
         		
         		if (i++ < 1) {
         			// first entrie
-        			mapView.getController().setCenter(point);
+        			mMapView.getController().setCenter(point);
         		}
         		
-        		OverlayItem overlayitem = new OverlayItem(point, "Cell: " + entrie.getKey(), _getEntrieDescription(entrie));
-                cellOverlay.addOverlay(overlayitem);
+        		LocationOverlayItem overlayItem = new LocationOverlayItem(point, "Cell: " + entrie.getKey(), _getEntrieDescription(entrie));
+        		overlayItem.setAccuracy(entrie.getAccuracy());
+                mCellOverlay.addOverlay(overlayItem);
         	}
         	
-        	if (cellOverlay.size() > 0) {
-        		mapView.getOverlays().add(cellOverlay);
+        	if (mCellOverlay.size() > 0) {
+        		mMapView.getOverlays().add(mCellOverlay);
         	} else {
-        		cellOverlay = null;
+        		mCellOverlay = null;
         	}
         }
         
         // wifi
         if (mApp.mDbWifi != null && mApp.mDbWifi.getNumEntries() > 0) {
-        	showWifi = true;
+        	mShowWifi = true;
         	Drawable drawableWifi = this.getResources().getDrawable(R.drawable.marker_wifi);
-            wifiOverlay = new MyItemizedOverlay(drawableWifi, this);
+            mWifiOverlay = new MyItemizedOverlay(drawableWifi, this);
         	
         	for (LocationCacheEntrie entrie : mApp.mDbWifi.getEntries()) {
         		if (entrie.getAccuracy() < 0) {
@@ -91,17 +102,19 @@ public class ShowMapActivity extends MapActivity {
         		
         		if (i++ < 1) {
         			// first entrie
-        			mapView.getController().setCenter(point);
+        			mMapView.getController().setCenter(point);
         		}
         		
-                OverlayItem overlayitem = new OverlayItem(point, "WiFi: " + entrie.getKey(), _getEntrieDescription(entrie));
-                wifiOverlay.addOverlay(overlayitem);
+        		LocationOverlayItem overlayItem = new LocationOverlayItem(point, "WiFi: " + entrie.getKey(), _getEntrieDescription(entrie));
+        		overlayItem.setAccuracy(entrie.getAccuracy());
+                //overlayitem.setAccura
+                mWifiOverlay.addOverlay(overlayItem);
         	}
         	
-        	if (wifiOverlay.size() > 0) {
-        		mapView.getOverlays().add(wifiOverlay);
+        	if (mWifiOverlay.size() > 0) {
+        		mMapView.getOverlays().add(mWifiOverlay);
         	} else {
-        		wifiOverlay = null;
+        		mWifiOverlay = null;
         	}
         }
     }
@@ -111,32 +124,38 @@ public class ShowMapActivity extends MapActivity {
 		return entrie.toString();
 	}
 
-	public boolean onCreateOptionsMenu(Menu menu) {
-    	menu.add(0, MENU_ITEM_CHANGE_MODE, 0, mapView.isSatellite() ? "Map" : "Satellite").setIcon(android.R.drawable.ic_menu_mapmode);
+	public boolean onCreateOptionsMenu(Menu menu)
+	{
+    	menu.add(0, MENU_ITEM_CHANGE_MODE, 0, mMapView.isSatellite() ? "Map" : "Satellite").setIcon(android.R.drawable.ic_menu_mapmode);
     	if (mApp.mDbCell != null && mApp.mDbCell.getNumEntriesWithPos() > 0) {
     		menu.add(0, MENU_ITEM_TOGGLE_CELL, 0, "Toggle Cell").setIcon(R.drawable.marker_cell);
     	}
     	if (mApp.mDbWifi != null && mApp.mDbWifi.getNumEntriesWithPos() > 0) {
     		menu.add(0, MENU_ITEM_TOGGLE_WIFI, 0, "Toggle WiFi").setIcon(R.drawable.marker_wifi);
     	}
-    	
+    	menu.add(0, MENU_ITEM_TOGGLE_ACCURACY, 0, "Toggle Accuracy");
     	return super.onCreateOptionsMenu(menu);
     }
     
     @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
+    public boolean onOptionsItemSelected(MenuItem item)
+    {
         switch (item.getItemId()) {
 	        case MENU_ITEM_CHANGE_MODE:
-	            mapView.setSatellite(!mapView.isSatellite());
-	            item.setTitle(mapView.isSatellite() ? "Normal" : "Satellite");
+	        	mMapView.setSatellite(!mMapView.isSatellite());
+	            item.setTitle(mMapView.isSatellite() ? "Normal" : "Satellite");
 	            return true;
 	        case MENU_ITEM_TOGGLE_CELL:
-	        	showCell = !showCell;
+	        	mShowCell = !mShowCell;
 	        	_updateMap();
 	        	return true;
 	        case MENU_ITEM_TOGGLE_WIFI:
-	        	showWifi = !showWifi;
+	        	mShowWifi = !mShowWifi;
 	        	_updateMap();
+	        	return true;
+	        case MENU_ITEM_TOGGLE_ACCURACY:
+	        	mShowAccuracy = !mShowAccuracy;
+	        	mMapView.invalidate();
 	        	return true;
         }
         
@@ -145,49 +164,75 @@ public class ShowMapActivity extends MapActivity {
     
     protected void _updateMap()
     {
-    	mapView.getOverlays().clear();
+    	mMapView.getOverlays().clear();
     	
-    	if (showWifi && wifiOverlay != null && wifiOverlay.size() > 0) {
-    		mapView.getOverlays().add(wifiOverlay);
+    	if (mShowWifi && mWifiOverlay != null && mWifiOverlay.size() > 0) {
+    		mMapView.getOverlays().add(mWifiOverlay);
     	}
-    	if (showCell && cellOverlay != null && cellOverlay.size() > 0) {
-    		mapView.getOverlays().add(cellOverlay);
+    	if (mShowCell && mCellOverlay != null && mCellOverlay.size() > 0) {
+    		mMapView.getOverlays().add(mCellOverlay);
     	}
-    	mapView.invalidate();
+    	mMapView.invalidate();
     }
 	
 	@Override
-	protected boolean isRouteDisplayed() {
+	protected boolean isRouteDisplayed()
+	{
 		return false;
 	}
 	
-	public class MyItemizedOverlay extends ItemizedOverlay {
+	public class MyItemizedOverlay extends ItemizedOverlay<LocationOverlayItem>
+	{
 		
 		private Context mContext;
-		private ArrayList<OverlayItem> mOverlays = new ArrayList<OverlayItem>();
+		private ArrayList<LocationOverlayItem> mOverlays = new ArrayList<LocationOverlayItem>();
 		
-		public MyItemizedOverlay(Drawable defaultMarker, Context context) {
+		public MyItemizedOverlay(Drawable defaultMarker, Context context)
+		{
 			super(boundCenterBottom(defaultMarker));
 			mContext = context;
 		}
 		
-		public void addOverlay(OverlayItem overlay) {
+		public void addOverlay(LocationOverlayItem overlay)
+		{
 		    mOverlays.add(overlay);
 		    populate();
 		}
 		
 		@Override
-		protected OverlayItem createItem(int i) {
+		protected LocationOverlayItem createItem(int i)
+		{
 		  return mOverlays.get(i);
 		}
 
 		@Override
-		public int size() {
+		public int size()
+		{
 			return mOverlays.size();
 		}
 		
 		@Override
-		protected boolean onTap(int index) {
+		public void draw(android.graphics.Canvas canvas, MapView mapView, boolean shadow)
+		{
+			if (mShowAccuracy) {
+				Paint paint = new Paint();
+				paint.setColor(0x16FF0000);
+				paint.setAntiAlias(true);
+							
+				for (LocationOverlayItem overlay : mOverlays) {
+					int radius = (int) (mapView.getProjection().metersToEquatorPixels(overlay.getAccuracy()));
+					GeoPoint geo = overlay.getPoint();
+					Point point = new Point();
+					mapView.getProjection().toPixels(geo, point);
+					canvas.drawCircle(point.x, point.y, radius, paint);
+				}
+			}
+			super.draw(canvas, mapView, shadow);
+		}
+		
+		@Override
+		protected boolean onTap(int index)
+		{
 			OverlayItem item = mOverlays.get(index);
 			AlertDialog.Builder dialog = new AlertDialog.Builder(mContext);
 			dialog.setTitle(item.getTitle());

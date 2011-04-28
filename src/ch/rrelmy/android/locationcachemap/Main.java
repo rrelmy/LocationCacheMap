@@ -143,7 +143,6 @@ public class Main extends Activity {
 			});
         	
         	mMainLayout.addView(mBtnFlush);
-        	getGpxContent();
         }
         
         // block + unblock
@@ -553,7 +552,9 @@ public class Main extends Activity {
     	    	File gpxfile = new File(root, "location-cache-export-" + (new SimpleDateFormat("yyyy.MM.dd-HH.mm.ss").format(new Date()).toString()) + ".gpx");
     	        FileWriter gpxwriter = new FileWriter(gpxfile);
     	        BufferedWriter out = new BufferedWriter(gpxwriter);
-    	        out.write(getGpxContent());
+    	        
+    	        writeGpx(out);
+    	        
     	        out.close();
     	        
     	        // dialog
@@ -576,40 +577,40 @@ public class Main extends Activity {
     	}
     }
 	
-    public String getGpxContent()
+    public void writeGpx(BufferedWriter out) throws IOException
     {
-    	// export a valid gpx file
-    	
-    	String content = "";
     	short numEntries = 0;
-    	
-    	
     	if (mApp.mDbCell != null && mApp.mDbCell.getNumEntriesWithPos() > 0) {
     		numEntries += mApp.mDbCell.getNumEntriesWithPos();
-    		content += mApp.mDbCell.toGpxEntries();
     	}
     	
     	if (mApp.mDbWifi != null && mApp.mDbWifi.getNumEntriesWithPos() > 0) {
     		numEntries += mApp.mDbWifi.getNumEntriesWithPos();
-    		content += mApp.mDbWifi.toGpxEntries();
     	}
     	
-    	content =
+    	out.write(
     			"<gpx xmlns=\"http://www.topografix.com/GPX/1/1\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" version=\"1.1\" xsi:schemaLocation=\"http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd\" creator=\"Location Cache Map\">\n" +
-    				"<metadata>\n" + 
-    					"<name>Android Location Cache</name>\n" +
-    					"<desc>total entries: " + numEntries + "</desc>\n" +
-    				"</metadata>\n" +
-    				"<trk>\n" +
-    					"<trkseg>\n" +
-    					
-    					content +
-    					
-    					"</trkseg>\n" +
-    				"</trk>\n" +
-    			"</gpx>\n";
+				"<metadata>\n" + 
+					"<name>Android Location Cache</name>\n" +
+					"<desc>total entries: " + numEntries + "</desc>\n" +
+				"</metadata>\n" +
+				"<trk>\n" +
+					"<trkseg>\n"
+    	);
     	
-    	return content;
+    	if (mApp.mDbCell != null && mApp.mDbCell.getNumEntriesWithPos() > 0) {
+    		mApp.mDbCell.writeGpx(out);
+    	}
+    	
+    	if (mApp.mDbWifi != null && mApp.mDbWifi.getNumEntriesWithPos() > 0) {
+    		mApp.mDbWifi.writeGpx(out);
+    	}
+    	
+    	out.write(
+	    			"</trkseg>\n" +
+					"</trk>\n" +
+				"</gpx>\n"
+    	);
     }
     
 }

@@ -16,6 +16,13 @@ v0.4
 - gpx export
 v0.5
 - even more bugs found
+v0.6 (not yet released)
+- accuracy overlay
+- TODO timeslider
+
+PERMISSIONS
+- INTERNET for the map tiles
+- WRITE for the GPX export
 
 Credits
 packetlss (information about the cache files)
